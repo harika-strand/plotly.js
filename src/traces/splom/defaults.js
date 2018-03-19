@@ -101,7 +101,8 @@ function handleDimensionsDefaults(traceIn, traceOut) {
 }
 
 function handleAxisDefaults(traceIn, traceOut, layout, coerce) {
-    var dimLength = traceOut.dimensions.length;
+    var dimensions = traceOut.dimensions;
+    var dimLength = dimensions.length;
     var xaxesDflt = new Array(dimLength);
     var yaxesDflt = new Array(dimLength);
     var i;
@@ -116,10 +117,16 @@ function handleAxisDefaults(traceIn, traceOut, layout, coerce) {
 
     // TODO what to do when xaxes.length or yaxes.length !== dimLength ???
 
-    for(i = 0; i < xaxes.length; i++) {
-        Lib.pushUnique(layout._splomXaxes, xaxes[i]);
-    }
-    for(i = 0; i < yaxes.length; i++) {
-        Lib.pushUnique(layout._splomYaxes, yaxes[i]);
+    for(i = 0; i < dimLength; i++) {
+        var dim = dimensions[i];
+        var xa = xaxes[i];
+        var ya = yaxes[i];
+
+        if(!(xa in layout._splomAxes.x)) {
+            layout._splomAxes.x[xa] = dim.label || '';
+        }
+        if(!(ya in layout._splomAxes.y)) {
+            layout._splomAxes.y[ya] = dim.label || '';
+        }
     }
 }

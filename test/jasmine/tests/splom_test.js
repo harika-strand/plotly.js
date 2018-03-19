@@ -36,7 +36,15 @@ describe('Test splom trace defaults:', function() {
     });
 
     it('should work with only one dimensions', function() {
-        // TODO this breaks at the moment
+        _supply({
+            dimensions: [
+                {values: [2, 1, 2]}
+            ]
+        });
+
+        var fullLayout = gd._fullLayout;
+        expect(fullLayout.xaxis.domain).toBeCloseToArray([0, 1]);
+        expect(fullLayout.yaxis.domain).toBeCloseToArray([0, 1]);
     });
 
     it('should set `grid.xaxes` and `grid.yaxes` default using the new of dimensions', function() {
@@ -102,7 +110,21 @@ describe('Test splom trace defaults:', function() {
     });
 
     it('should set axis title default using dimensions *label*', function() {
-        // TODO
+        _supply({
+            dimensions: [{
+                label: 'A',
+                values: [2, 3, 1]
+            }, {
+                label: 'B',
+                values: [1, 2, 1]
+            }]
+        });
+
+        var fullLayout = gd._fullLayout;
+        expect(fullLayout.xaxis.title).toBe('A');
+        expect(fullLayout.yaxis.title).toBe('A');
+        expect(fullLayout.xaxis2.title).toBe('B');
+        expect(fullLayout.yaxis2.title).toBe('B');
     });
 
     it('should lead to correct axis auto type value', function() {

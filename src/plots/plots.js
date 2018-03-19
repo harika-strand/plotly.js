@@ -369,8 +369,7 @@ plots.supplyDefaults = function(gd) {
     newFullLayout._modules = [];
     newFullLayout._basePlotModules = [];
     var subplots = newFullLayout._subplots = emptySubplotLists();
-    var splomXaxes = newFullLayout._splomXaxes = [];
-    var splomYaxes = newFullLayout._splomYaxes = [];
+    var splomAxes = newFullLayout._splomAxes = {x: {}, y: {}};
 
     // then do the data
     newFullLayout._globalTransforms = (gd._context || {}).globalTransforms;
@@ -378,14 +377,16 @@ plots.supplyDefaults = function(gd) {
 
     // redo grid size defaults with info about splom x/y axes,
     // and fill in generated cartesian axes and subplots
-    if(splomXaxes.length && splomYaxes.length) {
+    var splomXa = Object.keys(splomAxes.x);
+    var splomYa = Object.keys(splomAxes.y);
+    if(splomXa.length > 1 && splomYa.length > 1) {
         Registry.getComponentMethod('grid', 'sizeDefaults')(newLayout, newFullLayout);
 
-        for(i = 0; i < splomXaxes.length; i++) {
-            Lib.pushUnique(subplots.xaxis, splomXaxes[i]);
-            for(j = 0; j < splomYaxes.length; j++) {
-                if(i === 0) Lib.pushUnique(subplots.yaxis, splomYaxes[j]);
-                Lib.pushUnique(subplots.cartesian, splomXaxes[i] + splomYaxes[j]);
+        for(i = 0; i < splomXa.length; i++) {
+            Lib.pushUnique(subplots.xaxis, splomXa[i]);
+            for(j = 0; j < splomYa.length; j++) {
+                if(i === 0) Lib.pushUnique(subplots.yaxis, splomYa[j]);
+                Lib.pushUnique(subplots.cartesian, splomXa[i] + splomYa[j]);
             }
         }
     }

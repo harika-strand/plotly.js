@@ -167,7 +167,7 @@ var gridAttrs = {
 
 function getAxes(layout, grid, axLetter) {
     var gridVal = grid[axLetter + 'axes'];
-    var splomVal = layout[{x: '_splomXaxes', y: '_splomYaxes'}[axLetter]] || [];
+    var splomVal = Object.keys((layout._splomAxes || {})[axLetter] || {});
 
     if(Array.isArray(gridVal)) return gridVal;
     if(splomVal.length) return splomVal;
