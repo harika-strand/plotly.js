@@ -115,7 +115,8 @@ function plot(gd, _, cdata) {
         opts.domains[i] = [xa.domain[0], ya.domain[0], xa.domain[1], ya.domain[1]];
     }
 
-    scene.scatterOpts.viewport = [gs.l, gs.b, fullLayout.width, fullLayout.height];
+    scene.scatterOpts.viewport = [0, 0, fullLayout.width, fullLayout.height];
+    scene.scatterOpts.padding = [gs.l, gs.t, gs.r, gs.b];
 
     if(scene.matrix === true) {
         scene.matrix = createMatrix(regl);
