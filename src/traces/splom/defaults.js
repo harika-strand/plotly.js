@@ -31,6 +31,9 @@ module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout
     coerce('mode', traceOut._commonLength < PTS_LINESONLY ? 'lines+markers' : 'lines');
     coerce('text');
 
+    // TODO just markers for now
+    traceOut.mode = 'markers';
+
     if(subTypes.hasLines(traceOut)) {
         handleLineDefaults(traceIn, traceOut, defaultColor, layout, coerce);
         coerce('connectgaps');
