@@ -11,32 +11,38 @@
 var createRegl = require('regl');
 var createMatrix = require('regl-scattermatrix');
 
-var ScatterGl = require('../scattergl');
+var Lib = require('../../lib');
 var AxisIDs = require('../../plots/cartesian/axis_ids');
 
 var calcMarkerSize = require('../scatter/calc').calcMarkerSize;
 var calcAxisExpansion = require('../scatter/calc').calcAxisExpansion;
 var calcColorscales = require('../scatter/colorscale_calc');
+var convertMarkerStyle = require('../scattergl/convert').convertMarkerStyle;
 
-var TOO_MANY_POINTS = 1e5;
+var BADNUM = require('../../constants/numerical').BADNUM;
+var TOO_MANY_POINTS = require('../scattergl/constants').TOO_MANY_POINTS;
 
 function calc(gd, trace) {
     var stash = {};
     var opts = {};
-    var i;
+    var i, xa, ya;
 
     var dimLength = trace.dimensions.length;
     var hasTooManyPoints = (dimLength * trace._commonLength) > TOO_MANY_POINTS;
-    opts.data = new Array(dimLength);
-
-    var markerOptions = {};
+    var matrix = opts.data = new Array(dimLength);
 
     for(i = 0; i < dimLength; i++) {
-        var xa = AxisIDs.getFromId(gd, trace.xaxes[i]);
-        var ya = AxisIDs.getFromId(gd, trace.yaxes[i]);
-
         // using xa or ya should make no difference here
-        var vals = opts.data[i] = makeCalcdata(xa, trace, trace.dimensions[i]);
+        xa = AxisIDs.getFromId(gd, trace.xaxes[i]);
+        matrix[i] = makeCalcdata(xa, trace, trace.dimensions[i]);
+    }
+
+    calcColorscales(trace);
+    Lib.extendFlat(opts, convertMarkerStyle(trace));
+
+    for(i = 0; i < dimLength; i++) {
+        xa = AxisIDs.getFromId(gd, trace.xaxes[i]);
+        ya = AxisIDs.getFromId(gd, trace.yaxes[i]);
 
         // Re-use SVG scatter axis expansion routine except
         // for graph with very large number of points where it
@@ -45,38 +51,107 @@ function calc(gd, trace) {
         // and an average size for array marker.size inputs.
         var ppad;
         if(hasTooManyPoints) {
-            ppad = 2 * (markerOptions.sizeAvg || Math.max(markerOptions.size, 3));
-        } else if(markerOptions) {
-            ppad = calcMarkerSize(trace, trace._length);
+            ppad = 2 * (opts.sizeAvg || Math.max(opts.size, 3));
+        } else {
+            ppad = calcMarkerSize(trace, trace._commonLength);
         }
-        calcAxisExpansion(gd, trace, xa, ya, vals, vals, ppad);
+        calcAxisExpansion(gd, trace, xa, ya, matrix[i], matrix[i], ppad);
     }
 
-    // TODO
-    // - marker / line options
-    // - colorscale
-
-    var scene = stash.scene = {};
-    scene.scatterOpts = opts;
-
-    scene.matrix = true;
+    var scene = stash.scene = sceneUpdate(gd, stash);
+    if(!scene.matrix) scene.matrix = true;
+    scene.matrixOptions = opts;
 
     return [{x: false, y: false, t: stash, trace: trace}];
 }
 
 function makeCalcdata(ax, trace, dim) {
+    var i;
+
     var cdata = ax.makeCalcdata({
         v: dim.values,
         vcalendar: trace.calendar
     }, 'v');
 
+    for(i = 0; i < cdata.length; i++) {
+        cdata[i] = cdata[i] === BADNUM ? NaN : cdata[i];
+    }
+
     if(ax.type === 'log') {
-        for(var i = 0; i < cdata.length; i++) {
+        for(i = 0; i < cdata.length; i++) {
             cdata[i] = ax.c2l(cdata[i]);
         }
     }
 
     return cdata;
+}
+
+function sceneUpdate(gd, stash) {
+    var scene = stash._scene;
+
+    var reset = {
+        dirty: true,
+        opts: null
+    };
+
+    var first = {
+        selectBatch: null,
+        unselectBatch: null,
+        // regl- component stubs, initialized in dirty plot call
+        matrix: false,
+        select: null
+    };
+
+    if(!scene) {
+        scene = stash._scene = Lib.extendFlat({}, reset, first);
+
+        scene.update = function update(opt) {
+            if(scene.matrix) scene.matrix.update(opt);
+            scene.draw();
+        };
+
+        scene.draw = function draw() {
+            if(scene.matrix) scene.matrix.draw();
+
+            // TODO selection stuff
+
+            scene.dirty = false;
+        };
+
+        // make sure canvas is clear
+        scene.clear = function clear() {
+            // TODO
+        };
+
+        // remove selection
+        scene.clearSelect = function clearSelect() {
+            if(!scene.selectBatch) return;
+            scene.selectBatch = null;
+            scene.unselectBatch = null;
+            scene.matrix.update(scene.opts);
+            scene.clear();
+            scene.draw();
+        };
+
+        // remove scene resources
+        scene.destroy = function destroy() {
+            if(scene.matrix) scene.matrix.destroy();
+
+            scene.opts = null;
+            scene.selectBatch = null;
+            scene.unselectBatch = null;
+
+            stash._scene = null;
+        };
+    }
+
+    // In case if we have scene from the last calc - reset data
+    if(!scene.dirty) {
+        Lib.extendFlat(scene, reset);
+    }
+
+    return scene;
+
 }
 
 function plot(gd, _, cdata) {
@@ -103,28 +178,30 @@ function plot(gd, _, cdata) {
 
     var regl = fullLayout._glcanvas.data()[0].regl;
 
-    var opts = scene.scatterOpts;
     var dimLength = trace.dimensions.length;
-    opts.ranges = new Array(dimLength);
-    opts.domains = new Array(dimLength);
+    var viewOpts = {
+        ranges: new Array(dimLength),
+        domains: new Array(dimLength)
+    };
 
     for(var i = 0; i < dimLength; i++) {
         var xa = AxisIDs.getFromId(gd, trace.xaxes[i]);
         var ya = AxisIDs.getFromId(gd, trace.yaxes[i]);
-        opts.ranges[i] = [xa.range[0], ya.range[0], xa.range[1], ya.range[1]];
-        opts.domains[i] = [xa.domain[0], ya.domain[0], xa.domain[1], ya.domain[1]];
+        viewOpts.ranges[i] = [xa.range[0], ya.range[0], xa.range[1], ya.range[1]];
+        viewOpts.domains[i] = [xa.domain[0], ya.domain[0], xa.domain[1], ya.domain[1]];
     }
 
-    scene.scatterOpts.viewport = [0, 0, fullLayout.width, fullLayout.height];
-    scene.scatterOpts.padding = [gs.l, gs.t, gs.r, gs.b];
+    viewOpts.viewport = [0, 0, fullLayout.width, fullLayout.height];
+    viewOpts.padding = [gs.l, gs.t, gs.r, gs.b];
 
     if(scene.matrix === true) {
         scene.matrix = createMatrix(regl);
     }
     if(scene.matrix) {
-        scene.matrix.update(scene.scatterOpts);
-        scene.matrix.draw();
+        scene.matrix.update(scene.matrixOptions);
     }
+
+    scene.update(viewOpts);
 }
 
 // TODO splom 'needs' the grid component, register it here?
