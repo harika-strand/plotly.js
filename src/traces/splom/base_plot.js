@@ -40,6 +40,8 @@ function clean(newFullData, newFullLayout, oldFullData, oldFullLayout) {
 
 module.exports = {
     name: SPLOM,
+    attrRegex: Cartesian.attrRegex,
+    layoutAttributes: Cartesian.layoutAttributes,
     supplyLayoutDefaults: Cartesian.supplyLayoutDefaults,
     drawFramework: Cartesian.drawFramework,
     plot: plot,
